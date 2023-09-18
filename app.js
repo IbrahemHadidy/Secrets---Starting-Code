@@ -1,7 +1,9 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 
 const app = express();
 const port = 3000;
@@ -18,6 +20,9 @@ const userSchema = new mongoose.Schema({
   password: String,
 });
 
+const secret = ".JuSt.A.rAnDoM.sEcReT.";
+userSchema.plugin(encrypt, {secret: secret, encryptedFields: ["password"]});
+
 const User = new mongoose.model("User", userSchema);
 
 app.get("/", (req, res) => res.render("home"));
@@ -27,13 +32,13 @@ app.get("/secrets", (req, res) => res.render("secrets"));
 app.get("/logout", (req, res) => res.redirect("/"));
 
 app.post("/register", async (req, res) => {
-  const user = new User({
+  const newUser = new User({
     email: req.body.username,
     password: req.body.password
   });
 
   try {
-    await user.save();
+    await newUser.save();
     res.redirect("secrets");
   } catch(error) {
     console.error("Error during user save:", error);
