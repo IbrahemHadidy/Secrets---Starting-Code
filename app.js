@@ -1,9 +1,10 @@
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require('md5');
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 const port = process.env.PORT;
@@ -28,38 +29,43 @@ app.get("/secrets", (req, res) => res.render("secrets"));
 app.get("/logout", (req, res) => res.redirect("/"));
 
 app.post("/register", async (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password)
-  });
-
   try {
-    await newUser.save();
-    res.redirect("secrets");
-  } catch(error) {
-    console.error("Error during user save:", error);
-  }
+    const hash = await bcrypt.hash(req.body.password, saltRounds);
 
+    const newUser = new User({
+      email: req.body.username,
+      password: hash,
+    });
+
+    await newUser.save();
+    console.log('User registered:', newUser);
+    res.redirect("secrets");
+  } catch (error) {
+    console.error('Error during user registration:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
-app.post("/login", async (req, res) => {
-  const username = req.body.username;
-  const password = md5(req.body.password);
-  
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
   try {
-    const foundUser = await User.findOne({email: username});
+    const foundUser = await User.findOne({ email: username });
+
     if (!foundUser) {
       return res.status(404).send('User not found');
     }
-  
-    if (foundUser.password === password) {
-      return res.render('secrets');
+
+    const passwordMatch = await bcrypt.compare(password, foundUser.password);
+
+    if (passwordMatch) {
+      return res.redirect('secrets');
     } else {
       return res.status(401).send('Incorrect password');
     }
-  } catch {
-    console.error('Error while finding user:', error);
-    return res.status(500).send('Internal Server Error');
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
